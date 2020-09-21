@@ -117,7 +117,7 @@ def layer_norm(input_tensor, name=None, epsilon=1e-5):
     """Run layer normalization on the last dimension of the tensor."""
     name2use = f'LayerNorm_{name}' if name is not None else name
     with tf.variable_scope(name2use, default_name='LayerNorm'):
-        dim = input_tensor.shape[-1].value
+        dim = input_tensor.shape[-1]
         gamma = tf.get_variable('gamma', [dim], initializer=tf.constant_initializer(1))
         beta = tf.get_variable('beta', [dim], initializer=tf.constant_initializer(0))
         mean = tf.reduce_mean(input_tensor, axis=-1, keepdims=True)
@@ -214,13 +214,13 @@ def construct_scalar_host_call(metric_dict, model_dir, prefix=""):
           List of summary ops to run on the CPU host.
         """
         step = global_step[0]
-        with tf.contrib.summary.create_file_writer(
+        with tf.summary.create_file_writer(
                 logdir=model_dir, filename_suffix=".host_call").as_default():
-            with tf.contrib.summary.always_record_summaries():
+            with tf.summary.always_record_summaries():
                 for i, name in enumerate(metric_names):
-                    tf.contrib.summary.scalar(prefix + name, args[i][0], step=step)
+                    tf.summary.scalar(prefix + name, args[i][0], step=step)
 
-                return tf.contrib.summary.all_summary_ops()
+                return tf.compat.v1.summary.all_v2_summary_ops()
 
     # To log the current learning rate, and gradient norm for Tensorboard, the
     # summary op needs to be run on the host CPU via host_call. host_call

@@ -616,7 +616,7 @@ def model_fn_builder(config: GroverConfig, init_checkpoint, learning_rate,
         output_spec = None
         if mode == tf.estimator.ModeKeys.TRAIN:
             if use_tpu:
-                output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+                output_spec = tf.compat.v1.estimator.tpu.TPUEstimatorSpec(
                     mode=mode,
                     loss=total_loss,
                     train_op=train_op,
@@ -624,7 +624,7 @@ def model_fn_builder(config: GroverConfig, init_checkpoint, learning_rate,
                                                          prefix='training/'),
                     scaffold_fn=scaffold_fn)
             else:
-                output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+                output_spec = tf.compat.v1.estimator.tpu.TPUEstimatorSpec(
                     mode=mode,
                     loss=total_loss,
                     train_op=train_op,
@@ -641,7 +641,7 @@ def model_fn_builder(config: GroverConfig, init_checkpoint, learning_rate,
 
             eval_metrics = (metric_fn,
                             [total_loss])
-            output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+            output_spec = tf.compat.v1.estimator.tpu.TPUEstimatorSpec(
                 mode=mode,
                 loss=total_loss,
                 eval_metrics=eval_metrics,
@@ -668,7 +668,7 @@ def model_fn_builder(config: GroverConfig, init_checkpoint, learning_rate,
                 )
             pred_logprobs = tf.squeeze(tf.batch_gather(model.log_probs, predictions[:, :, None]), axis=2)
 
-            output_spec = tf.contrib.tpu.TPUEstimatorSpec(
+            output_spec = tf.compat.v1.estimator.tpu.TPUEstimatorSpec(
                 mode=mode,
                 predictions={'gt_logprobs': gt_logprobs,
                              'top_p_required': top_p_required,
@@ -783,7 +783,7 @@ def sample(news_config: GroverConfig, initial_context, eos_token, min_len, ignor
             return tf.logical_not(tf.logical_and(is_eos, is_len))
 
         tokens, cache, probs = tf.while_loop(
-            cond=cond, body=body, maximum_iterations=1025 - get_shape_list(ctx)[1],
+            cond=cond, body=body, maximum_iterations=2048 - get_shape_list(ctx)[1],
             loop_vars=[ctx, cache, probs],
             shape_invariants=[tf.TensorShape([batch_size, None]),
                               tf.TensorShape(

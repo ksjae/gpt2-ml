@@ -19,12 +19,12 @@ from train.utils import get_shape_list
 
 def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu):
     """Creates an optimizer training op."""
-    global_step = tf.train.get_or_create_global_step()
+    global_step = tf.compat.v1.train.get_or_create_global_step()
 
     learning_rate = tf.constant(value=init_lr, shape=[], dtype=tf.float32)
 
     # Implements linear decay of the learning rate.
-    learning_rate = tf.train.polynomial_decay(
+    learning_rate = tf.compat.v1.train.polynomial_decay(
         learning_rate,
         global_step,
         num_train_steps,
@@ -60,9 +60,9 @@ def create_optimizer(loss, init_lr, num_train_steps, num_warmup_steps, use_tpu):
         exclude_from_weight_decay=["LayerNorm", "layer_norm", "bias"])
 
     if use_tpu:
-        optimizer = tf.contrib.tpu.CrossShardOptimizer(optimizer)
+        optimizer = tf.compat.v1.tpu.CrossShardOptimizer(optimizer)
 
-    tvars = tf.trainable_variables()
+    tvars = tf.compat.v1.trainable_variables()
     grads = tf.gradients(loss, tvars)
 
     # You could do this, but instead we don't because a) it's slow and b) we already did the 'update clipping'
@@ -157,13 +157,13 @@ class AdaFactorOptimizer(tf.compat.v1.train.Optimizer):
             if self._use_factored(shape_list):
                 num_rows, num_columns = shape_list
 
-                vr = tf.get_variable(
+                vr = tf.compat.v1.get_variable(
                     name=param_name + "/adafactor_vr",
                     shape=[num_rows],
                     dtype=tf.float32,
                     trainable=False,
                     initializer=tf.zeros_initializer())
-                vc = tf.get_variable(
+                vc = tf.compat.v1.get_variable(
                     name=param_name + "/adafactor_vc",
                     shape=[num_columns],
                     dtype=tf.float32,
@@ -181,7 +181,7 @@ class AdaFactorOptimizer(tf.compat.v1.train.Optimizer):
                 assignments.append(vr.assign(next_vr, use_locking=self.use_locking))
                 assignments.append(vc.assign(next_vc, use_locking=self.use_locking))
             else:
-                v = tf.get_variable(
+                v = tf.compat.v1.get_variable(
                     name=param_name + "/adafactor_v",
                     shape=shape_list,
                     dtype=tf.float32,

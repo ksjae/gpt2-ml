@@ -5,15 +5,15 @@ NOTE: You will want to do this using several processes. I did this on an AWS mac
 as that's where I had the deduplicated RealNews dataset.
 """
 import argparse
-import ujson as json
+import glob
 # from sample.encoder import get_encoder, tokenize_for_grover_training, detokenize, sliding_window, create_int_feature
 import random
 import tensorflow.compat.v1 as tf
 import collections
 import os
 from tempfile import TemporaryDirectory
-
-from tokenization import tokenization
+from tokenizers import ByteLevelBPETokenizer
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser(description='SCRAPE!')
 parser.add_argument(
@@ -65,8 +65,9 @@ args = parser.parse_args()
 random.seed(args.seed + args.fold)
 
 #encoder = get_encoder()
-tokenizer = tokenization.FullTokenizer(
-    vocab_file="bert-base-chinese-vocab.txt", do_lower_case=True)
+#tokenizer = tokenization.FullTokenizer(
+#    vocab_file="bert-base-chinese-vocab.txt", do_lower_case=True)
+tokenizer = ByteLevelBPETokenizer('kotok/vocab.json', 'kotok/merges.txt')
 
 
 class TFRecordWriter(object):
@@ -117,29 +118,27 @@ class TFRecordWriter(object):
 def article_iterator(tokenizer):
     """ Iterate through the provided filename + tokenize"""
     assert os.path.exists(args.input_fn)
-    for (dirpath, dirnames, filenames) in os.walk(args.input_fn):
-        for filename in filenames:
-            with open(os.path.join(dirpath, filename), 'r') as f:
-                for l_no, l in enumerate(f):
-                    if l_no % args.num_folds == args.fold:
-                        article = json.loads(l)
+    for filename in glob.glob(args.input_fn):
+        with open(filename, 'r') as f:
+            for l_no, l in enumerate(f):
+                if l_no % args.num_folds == args.fold:
+                    article = dict()
+                    article['inst_index'] = l_no
+                    encoded = tokenizer.encode(l)
+                    tokens = encoded.tokens
+                    input_ids = encoded.ids
 
-                        line = tokenization.convert_to_unicode(
-                            article['text'])  # for news2016zh text body
-                        tokens = tokenizer.tokenize(line)
-                        input_ids = tokenizer.convert_tokens_to_ids(tokens)
-
-                        article['input_ids'] = input_ids
-
-                        article['inst_index'] = (l_no // args.num_folds)
-                        if article['inst_index'] < 100:
-                            print('---\nINPUT{}. {}\n---\nTokens: {}\n'.format(article['inst_index'],
-                                                                            tokens,
-                                                                            input_ids
-                                                                            ), flush=True)
-                        if len(article['input_ids']) <= 64:  # min size of article
-                            continue
-                        yield article
+                    article['input_ids'] = input_ids
+                    '''
+                    if article['inst_index'] < 100:
+                        print('---\nINPUT{}. {}\n---\nTokens: {}\n'.format(article['inst_index'],
+                                                                        tokens,
+                                                                        input_ids
+                                                                        ), flush=True)
+                    '''
+                    if len(article['input_ids']) <= 64:  # min size of article
+                        continue
+                    yield article
 
 
 def create_int_feature(values):
@@ -160,10 +159,10 @@ def buffered_and_sliding_window_article_iterator(tokenizer, final_desired_size=1
 
 # OK now write the tfrecord file
 total_written = 0
-train_file = args.base_fn + 'train_wiki19_{:04d}.tfrecord'.format(args.fold)
+train_file = args.base_fn + '_{:04d}.tfrecord'.format(args.fold)
 with TFRecordWriter(train_file) as train_writer:
-    for article in buffered_and_sliding_window_article_iterator(tokenizer,
-                                                                final_desired_size=args.max_seq_length + 1):
+    for article in tqdm(buffered_and_sliding_window_article_iterator(tokenizer,
+                                                                final_desired_size=args.max_seq_length + 1)):
         writer2use = train_writer
         assert len(article['input_ids']) == (args.max_seq_length + 1)
 
@@ -175,14 +174,9 @@ with TFRecordWriter(train_file) as train_writer:
         writer2use.write(tf_example.SerializeToString())
         total_written += 1
 
-        # DEBUG
-        if article['inst_index'] < 5:
-            print("~~~\nIndex {}. ARTICLE: {}\n---\nTokens: {}\n\n".format(article['inst_index'],
-                                                                           tokenizer.convert_ids_to_tokens(
-                                                                               article['input_ids']),
-                                                                           article['input_ids']
-                                                                           ), flush=True)
+        '''
         if article['inst_index'] % 1000 == 0:
             print("{} articles, {} written".format(
                 article['inst_index'], total_written), flush=True)
+        '''
 print("DONE UPLOADING", flush=True)
